@@ -9,12 +9,15 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, mean_squared_error
 
-
+# Load MNIST data
+# Using a subset for faster experimentation
 def select_data():
     mnist = fetch_openml('mnist_784', version=1)
     x, y = mnist.data[:5000], mnist.target.astype(int)[:5000]
     return x, y
 
+# Scale data
+# Fit scaler on training data, transform both train and test
 def fit_scaler_transform(X_train, X_test, scaler = None):
     if scaler is None:
         scaler = StandardScaler()
@@ -23,12 +26,15 @@ def fit_scaler_transform(X_train, X_test, scaler = None):
     X_test_scaled = scaler.transform(X_test)
     return X_train_scaled, X_test_scaled, scaler
 
+# PCA transformation
+# Fit PCA on training data, transform both train and test
 def pca_transform(X_train, X_test, n_components=50):
     pca = PCA(n_components=n_components)
     X_train_pca = pca.fit_transform(X_train)
     X_test_pca = pca.transform(X_test)
     return X_train_pca, X_test_pca, pca
 
+# Evaluate accuracy using RandomForestClassifier
 def pca_accuracy(X_train_pca, X_test_pca, y_train, y_test):
     clf = RandomForestClassifier(n_estimators=100, random_state=43)
     clf.fit(X_train_pca, y_train)
@@ -36,6 +42,7 @@ def pca_accuracy(X_train_pca, X_test_pca, y_train, y_test):
     accuracy = accuracy_score(y_test, y_pred)
     return accuracy
 
+# Experiment with different PCA components
 def experiment_pca_components(X_train_scaled, X_test_scaled, y_train, y_test, comps):
     results = []
     for k in comps:
@@ -71,17 +78,29 @@ def experiment_pca_components(X_train_scaled, X_test_scaled, y_train, y_test, co
     return df
 
 def main():
+    # STEP 1: Data collection
     X, y = select_data()
+
+    # STEP 2: Split into training and test sets (keeps a hold-out set for final evaluation)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    # STEP 3: Preprocessing - scale features.
+    # Important: fit scaler only on training data to avoid data leakage.
     X_train_scaled, X_test_scaled, scaler_obj = fit_scaler_transform(X_train, X_test, StandardScaler())
 
+    # STEP 4: Dimensionality reduction with PCA (fit on training, apply to test)
     X_train_pca, X_test_pca, pca = pca_transform(X_train_scaled, X_test_scaled, n_components=50)
 
+    # STEP 5: Baseline training & evaluation
+    # - Baseline 1: use scaled raw pixels as features
     print("After scaling:")
     print("Accuracy on raw pixels:", pca_accuracy(X_train_scaled, X_test_scaled, y_train, y_test))
+    
+    # - Baseline 2: use PCA-reduced features
     print("Accuracy on PCA:", pca_accuracy(X_train_pca, X_test_pca, y_train, y_test))
 
+    # STEP 6: Systematic experiment over different PCA component counts
+    # For each k the experiment records: accuracy, training time, cumulative explained variance, reconstruction MSE.
     df_results = experiment_pca_components(X_train_scaled, X_test_scaled, y_train, y_test, comps=[10, 20, 30, 40, 50, 60, 70, 80, 90, 100])
     print(df_results)
 
